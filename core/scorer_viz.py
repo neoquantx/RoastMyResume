@@ -28,7 +28,7 @@ RISK_COLORS = {
     "low": ACCENT,
     "medium": "#9B712D",
     "high": "#B35C45",
-    "critical": "#B35C45",
+    "critical": "#8B1A1A",
 }
 RISK_LABELS = {
     "low": "Low risk",
@@ -106,16 +106,57 @@ def _empty(fig, message):
 
 
 def build_rejection_risk_gauge(risk_score: int) -> go.Figure:
-    """Show an analysis score out of 100 with guaranteed centered placement."""
+    """Show an estimated rejection risk index from 0 to 100 (lower is better)."""
     score = _number(risk_score, 100)
     fig = _figure("", height=260)
     fig.update_layout(margin=dict(t=20, b=30, l=20, r=20))
     if score is None:
         return _empty(fig, "Score unavailable<br>A score from 0 to 100 is needed.")
 
+    if score >= 80:
+        risk = "critical"
+    elif score >= 60:
+        risk = "high"
+    elif score >= 30:
+        risk = "medium"
+    else:
+        risk = "low"
+
+    fig.add_trace(go.Indicator(
+        mode="gauge+number",
+        value=score,
+        number=dict(suffix=" /100", font=dict(family=FONT_STACK, size=32, color=INK)),
+        domain=dict(x=[0.08, 0.92], y=[0.15, 0.95]),
+        gauge=dict(
+            axis=dict(range=[0, 100], tickvals=[0, 50, 100], tickcolor=BORDER,
+                      tickfont=dict(size=12, color=MUTED, family=FONT_STACK)),
+            bar=dict(color=RISK_COLORS[risk], thickness=0.36),
+            bgcolor=CANVAS,
+            borderwidth=1,
+            bordercolor=BORDER,
+            steps=[dict(range=[0, 100], color=TINT)],
+        ),
+    ))
+    fig.add_annotation(
+        text=f"<span style='color:{RISK_COLORS[risk]};font-weight:600;'>{RISK_LABELS[risk]}</span> · not a probability",
+        x=0.5, y=-0.04, xref="paper", yref="paper",
+        showarrow=False,
+        font=dict(size=12, color=MUTED, family=FONT_STACK),
+    )
+    return fig
+
+
+def build_resume_score_gauge(score: int) -> go.Figure:
+    """Show an overall resume score out of 100 (higher is better) with guaranteed centered placement."""
+    val = _number(score, 100)
+    fig = _figure("", height=260)
+    fig.update_layout(margin=dict(t=20, b=30, l=20, r=20))
+    if val is None:
+        return _empty(fig, "Score unavailable<br>A score from 0 to 100 is needed.")
+
     # Higher is better
-    rating = "excellent" if score >= 85 else "good" if score >= 70 else "fair" if score >= 50 else "poor"
-    
+    rating = "excellent" if val >= 85 else "good" if val >= 70 else "fair" if val >= 50 else "poor"
+
     RATING_COLORS = {
         "excellent": ACCENT,
         "good": "#9B712D",
@@ -128,11 +169,11 @@ def build_rejection_risk_gauge(risk_score: int) -> go.Figure:
         "fair": "Needs improvement",
         "poor": "Weak match",
     }
-    
+
     color = RATING_COLORS[rating]
     fig.add_trace(go.Indicator(
         mode="gauge",
-        value=score,
+        value=val,
         domain=dict(x=[0.08, 0.92], y=[0.15, 0.95]),
         gauge=dict(
             axis=dict(range=[0, 100], tickvals=[0, 50, 100], tickcolor=BORDER,
@@ -146,7 +187,7 @@ def build_rejection_risk_gauge(risk_score: int) -> go.Figure:
     ))
     # Centered score number - guaranteed exact placement, no Plotly auto-displacement glitches
     fig.add_annotation(
-        text=f"<b>{int(round(score))}</b>",
+        text=f"<b>{int(round(val))}</b>",
         x=0.5, y=0.30, xref="paper", yref="paper",
         showarrow=False,
         font=dict(size=44, color=INK, family=FONT_STACK),
