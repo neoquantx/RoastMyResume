@@ -31,6 +31,13 @@ def main():
 ╚══════════════════════════════════════════════╝
     """)
 
+    # 0. Sanity: are we in a virtual environment?
+    if not (hasattr(sys, "real_prefix") or (hasattr(sys, "base_prefix") and sys.base_prefix != sys.prefix)):
+        print("ℹ️  Tip: consider running inside a virtual environment first:")
+        print("     python3 -m venv venv && source venv/bin/activate   (Linux/Mac)")
+        print("     python -m venv venv && venv\\Scripts\\activate      (Windows)")
+        print()
+
     # 1. Install Python deps
     ok = run(f"{sys.executable} -m pip install -r requirements.txt", "Installing Python dependencies...")
     if not ok:
@@ -58,6 +65,17 @@ def main():
     print("▶ Pulling Llama 3.2 model (this runs locally, ~2GB download)...")
     print("  You can also use: mistral, gemma2, phi3 — all open-source!")
     run("ollama pull llama3.2", "Downloading Llama 3.2...")
+
+    # 4. Create .env from the example if it doesn't exist yet
+    if not os.path.exists(".env"):
+        if os.path.exists(".env.example"):
+            with open(".env.example") as src, open(".env", "w") as dst:
+                dst.write(src.read())
+            print("\n✅ Created .env from .env.example (project root).")
+            print("   It's OPTIONAL — only needed for the voice-roast feature.")
+            print("   Get a free ElevenLabs key at https://elevenlabs.io and paste it in.")
+        else:
+            print("\n⚠️  .env.example not found — create a .env manually if you want voice roasts.")
 
     print("""
 ╔══════════════════════════════════════════════╗
