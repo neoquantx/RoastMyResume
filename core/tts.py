@@ -1,7 +1,5 @@
 import os
 import requests
-import streamlit as st
-
 # Load environment variables if python-dotenv is installed
 try:
     from dotenv import load_dotenv
@@ -62,9 +60,15 @@ def generate_voice_roast(text: str, persona: str) -> bytes | None:
         }
     }
     
-    response = requests.post(url, json=data, headers=headers)
+    try:
+        response = requests.post(url, json=data, headers=headers, timeout=30)
+    except requests.RequestException as exc:
+        # Network failures are not RuntimeError, so surface them as one error type
+        # for the caller instead of letting a stack trace escape.
+        raise RuntimeError(f"Could not reach ElevenLabs: {exc}") from exc
+
     if response.status_code == 200:
         return response.content
-    else:
-        st.error(f"Voice generation failed: {response.text}")
-        return None
+    raise RuntimeError(
+        f"ElevenLabs API error {response.status_code}: {response.text[:300]}"
+    )
