@@ -68,6 +68,30 @@ class RejectionRiskGaugeTests(FigureAssertions):
                 self.assert_unavailable(viz.build_rejection_risk_gauge(value))
 
 
+class ResumeScoreGaugeTests(FigureAssertions):
+    def test_valid_scores_and_ratings(self):
+        for value, expected_color in (
+            (0, "#B35C45"), (49.9, "#B35C45"), (50, "#B35C45"),
+            (69.9, "#B35C45"), (70, "#9B712D"), (84.9, "#9B712D"),
+            (85, viz.ACCENT), (100, viz.ACCENT), (" 42.5 ", "#B35C45"),
+        ):
+            with self.subTest(value=value):
+                figure = viz.build_resume_score_gauge(value)
+                self.assert_styled(figure)
+                indicator = figure.data[0]
+                self.assertEqual(indicator.value, float(value))
+                self.assertEqual(indicator.mode, "gauge")
+                self.assertEqual(tuple(indicator.gauge.axis.range), (0, 100))
+                self.assertEqual(indicator.gauge.bar.color, expected_color)
+                self.assertEqual(figure.layout.annotations[0].text, f"<b>{int(round(float(value)))}</b>")
+                self.assertIn("Higher is better", figure.layout.annotations[1].text)
+
+    def test_unavailable_scores_are_not_fabricated(self):
+        for value in INVALID_SCORES:
+            with self.subTest(value=value):
+                self.assert_unavailable(viz.build_resume_score_gauge(value))
+
+
 class SectionRadarTests(FigureAssertions):
     def test_complete_radar_closes_without_changing_scores(self):
         figure = viz.build_section_radar(SECTIONS)
@@ -123,7 +147,7 @@ class SectionBarTests(FigureAssertions):
         self.assertEqual(tuple(figure.data[0].x), (0, 65.5, 100))
         self.assertEqual(tuple(figure.layout.xaxis.range), (0, 100))
         self.assertEqual(tuple(figure.data[0].marker.color),
-                         ("#B35C45", "#9B712D", "#5F7144"))
+                         ("#8B1A1A", "#9B712D", "#5F7144"))
         self.assertEqual([a.text for a in figure.layout.annotations], ["0/100", "65.5/100", "100/100"])
         for annotation in figure.layout.annotations:
             self.assertEqual(annotation.xref, "paper")
