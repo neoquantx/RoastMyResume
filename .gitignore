@@ -28,9 +28,12 @@ share/python-wheels/
 
 # Virtual environments
 venv/
+venv*/
 .venv/
+.venv*/
 env/
 ENV/
+*.venv/
 
 # Streamlit
 .streamlit/secrets.toml
@@ -42,3 +45,5 @@ data/temp/
 # OS files
 .DS_Store
 Thumbs.db
+venv_clean/
+venv_new/
