@@ -24,12 +24,12 @@ from core.exporter import generate_docx_export, generate_markdown_export
 from core.tts import generate_voice_roast, get_elevenlabs_key
 from core.scorer_viz import (
     build_keyword_match_donut,
-    build_rejection_risk_gauge,
+    build_resume_score_gauge,
     build_section_bar,
     build_section_radar,
-    get_verdict_color_and_emoji,
 )
 from ui import brand, hero, section_heading, tags
+from ui.diff import render_word_diff
 
 
 st.set_page_config(
@@ -51,7 +51,7 @@ components.html(
     function ensureSidebarOpen() {
         try {
             const doc = window.parent.document;
-            const expandBtn = doc.querySelector('[data-testid="stExpandSidebarButton"] button') || doc.querySelector('[data-testid="stExpandSidebarButton"]');
+            const expandBtn = doc.querySelector('[data-testid="collapsedControl"]') || doc.querySelector('[data-testid="stExpandSidebarButton"] button') || doc.querySelector('[data-testid="stExpandSidebarButton"]');
             if (expandBtn) {
                 expandBtn.click();
             }
@@ -147,31 +147,31 @@ def render_scorecard(report):
         computed_score = min(int(round(weighted_score)), 25)
         verdict = "Severe role mismatch"
         verdict_sub = "This resume shows qualifications in a completely different domain than the target job."
-        color = "#B35C45"
+        verdict_class = "verdict-severe"
     elif match_pct <= 30 or ats == "poor":
         computed_score = min(int(round(weighted_score)), 45)
         verdict = "Comprehensive revision needed"
         verdict_sub = "Significant experience and keyword gaps for this role."
-        color = "#B35C45"
+        verdict_class = "verdict-severe"
     elif weighted_score < 60:
         computed_score = int(round(weighted_score))
         verdict = "Needs refinement"
         verdict_sub = "A starting point for improvement, not a prediction of a hiring decision."
-        color = "#9B712D"
+        verdict_class = "verdict-warning"
     elif weighted_score < 80:
         computed_score = int(round(weighted_score))
         verdict = "Ready for junior roles"
         verdict_sub = "Solid foundation with good potential for junior or entry-level positions."
-        color = "#5F7144"
+        verdict_class = "verdict-ok"
     else:
         computed_score = int(round(weighted_score))
         verdict = "Strong candidate"
         verdict_sub = "Strong alignment with the core requirements of this role."
-        color = "#5F7144"
+        verdict_class = "verdict-ok"
 
     st.markdown(
         f'<div class="verdict"><span class="eyebrow">THE BIG PICTURE</span>'
-        f'<h3 style="color:{color}">{escape(verdict)}</h3>'
+        f'<h3 class="{verdict_class}">{escape(verdict)}</h3>'
         f'<p>{escape(verdict_sub)}</p></div>',
         unsafe_allow_html=True,
     )
@@ -183,12 +183,16 @@ def render_scorecard(report):
     c.metric("Role keyword match", f"{match}%" if match is not None else "Unavailable")
     d.metric("ATS compatibility", str(scores.get("ats_compatibility", "Unavailable")).title())
     st.caption("AI-generated estimates, not measured recruiter behavior. Higher scores are better.")
+    st.caption(
+        "Score formula: 45% core sections (experience, projects, skills) "
+        "+ 40% role keyword match + 15% structure (formatting, contact, education, summary)."
+    )
 
     left, right = st.columns(2, gap="large")
     with left:
         with st.container(border=True):
             st.markdown("#### Overall Resume Score")
-            st.plotly_chart(build_rejection_risk_gauge(computed_score), use_container_width=True, config={"displayModeBar": False})
+            st.plotly_chart(build_resume_score_gauge(computed_score), use_container_width=True, config={"displayModeBar": False})
     with right:
         with st.container(border=True):
             st.markdown("#### Strength by section")
@@ -218,6 +222,17 @@ def render_scorecard(report):
 
 def render_report(report):
     st.markdown('<div class="report-anchor" id="your-review"></div>', unsafe_allow_html=True)
+    # Auto-scroll to review on render
+    components.html("""
+        <script>
+        (function() {
+            const anchor = window.parent.document.getElementById('your-review');
+            if (anchor) {
+                anchor.scrollIntoView({ behavior: 'smooth', block: 'start' });
+            }
+        })();
+        </script>
+    """, height=0, width=0)
     section_heading("YOUR REVIEW", "A clearer picture. A practical next step.")
     st.caption(f'{report["resume"]["file_name"]} · {report["persona"]} · {report["model"]} · Generated in {report["elapsed"]}s')
     review, scorecard, rewrite, interview, chat_tab = st.tabs(["The review", "Scorecard", "Rewrite a section", "Interview prep", "💬 Q&A"])
@@ -232,9 +247,12 @@ def render_report(report):
             if get_elevenlabs_key():
                 if st.button("🔊 Listen to Roast (ElevenLabs)", key="play_roast", help="Generates audio using your ElevenLabs API key"):
                     with st.spinner("Generating brutal voiceover..."):
-                        audio_bytes = generate_voice_roast(report["roast"], report["persona"])
-                        if audio_bytes:
-                            st.audio(audio_bytes, format="audio/mp3", autoplay=True)
+                        try:
+                            audio_bytes = generate_voice_roast(report["roast"], report["persona"])
+                            if audio_bytes:
+                                st.audio(audio_bytes, format="audio/mp3", autoplay=True)
+                        except RuntimeError as e:
+                            st.error(str(e))
             else:
                 st.caption("Add ElevenLabs API key to `.env` to enable audio roasting.")
 
@@ -271,9 +289,20 @@ def render_report(report):
         if saved:
             if saved["source"] != original:
                 st.info("You changed the source text. Rewrite again to update the draft below.")
+
+            diff_toggle = st.toggle("Show word-level diff", key=f"diff_toggle_{report['id']}_{section}")
+
             with st.container(border=True):
-                st.markdown("#### Suggested rewrite")
-                st.markdown(saved["text"])
+                if diff_toggle:
+                    st.markdown("#### Word-level diff")
+                    st.caption("Green = added · Red strikethrough = removed")
+                    st.markdown(
+                        render_word_diff(saved["source"], saved["text"]),
+                        unsafe_allow_html=True,
+                    )
+                else:
+                    st.markdown("#### Suggested rewrite")
+                    st.markdown(saved["text"])
             st.caption("Review before using: verify every fact, skill and metric. Remove anything you cannot substantiate.")
     with interview:
         st.markdown("### Be ready for the follow-up.")
@@ -294,6 +323,7 @@ def render_report(report):
             st.markdown('<div class="quiet-empty"><span class="empty-symbol">?</span><h4>A little preparation goes a long way.</h4><p>Your questions and talking points will appear here.</p></div>', unsafe_allow_html=True)
     with chat_tab:
         st.markdown("### Ask follow-up questions")
+        st.caption("Ask about specific frameworks, career choices, or how to phrase your experience for this role.")
         
         chat_key = f"chat_{report['id']}"
         if chat_key not in st.session_state:
@@ -309,16 +339,12 @@ def render_report(report):
                 and "First off, great job on your resume" not in m.get("content", "")
             ]
 
-        chat_header_col1, chat_header_col2 = st.columns([4, 1])
-        with chat_header_col1:
-            st.caption("Ask about specific frameworks, career choices, or how to phrase your experience for this role.")
-        with chat_header_col2:
-            if len(st.session_state[chat_key]) > 1:
-                if st.button("Reset chat", key=f"reset_chat_{report['id']}", type="secondary"):
-                    st.session_state[chat_key] = [
-                        {"role": "assistant", "content": f"I'm ready. What do you want to ask about your resume or this role? I'll review it keeping the {report['persona']} perspective in mind."}
-                    ]
-                    st.rerun()
+        if len(st.session_state[chat_key]) > 1:
+            if st.button("Reset chat", key=f"reset_chat_{report['id']}", type="secondary"):
+                st.session_state[chat_key] = [
+                    {"role": "assistant", "content": f"I'm ready. What do you want to ask about your resume or this role? I'll review it keeping the {report['persona']} perspective in mind."}
+                ]
+                st.rerun()
             
         # Display chat messages from history on app rerun
         for msg in st.session_state[chat_key]:
@@ -480,15 +506,34 @@ else:
                             st.text(st.session_state["upload_error"])
                 if resume_data:
                     st.success(f'Ready to review · {resume_data["word_count"]} words')
+                    if len(resume_data["raw_text"]) > 3000:
+                        st.warning(
+                            f"This resume is {len(resume_data['raw_text']):,} characters. "
+                            "The AI reviews the first ~3,000 characters for scoring and ~4,000 for the written "
+                            "feedback. If your resume is 2+ pages, consider trimming it or checking that the "
+                            "most important sections appear early."
+                        )
                     with st.expander("Check extracted text"):
                         st.text_area("Extracted resume text", resume_data["raw_text"], height=200, disabled=True)
                         tags(list(resume_data.get("sections", {})), "neutral")
             else:
-                st.markdown('<div class="upload-hint"><span class="small-check">✓</span><span>Your original document stays unchanged.</span></div>', unsafe_allow_html=True)
+                st.markdown('''
+                    <div class="job-description-empty" style="min-height: 220px;">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+                            <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
+                            <polyline points="14 2 14 8 20 8"/>
+                            <line x1="16" y1="13" x2="8" y2="13"/>
+                            <line x1="16" y1="17" x2="8" y2="17"/>
+                            <polyline points="10 9 9 9 8 9"/>
+                        </svg>
+                        <h4>Upload your resume</h4>
+                        <p>Drag & drop a PDF or DOCX, or click to browse. Text-based documents only — scanned PDFs won't work.</p>
+                    </div>
+                ''', unsafe_allow_html=True)
 
     with right:
         with st.container(border=True):
-            section_heading("02 / THE OPPORTUNITY", "What’s the next move?", "Give your feedback a role to focus on.", level=3)
+            section_heading("02 / THE OPPORTUNITY", "What's the next move?", "Give your feedback a role to focus on.", level=3)
             input_type = st.radio("Job description source", ["Paste description", "Import from URL", "Describe a role"], horizontal=True, label_visibility="collapsed", key="job_source")
             job_text = ""
             if input_type == "Paste description":
@@ -504,7 +549,7 @@ else:
                         with st.spinner("Reading the job posting…"):
                             imported = scrape_jd_from_url(job_url.strip())
                         if not imported.strip() or imported.startswith("[Error"):
-                            st.error("This posting couldn’t be imported. The site may restrict access. Choose ‘Paste description’ instead.")
+                            st.error("This posting couldn't be imported. The site may restrict access. Choose 'Paste description' instead.")
                             st.session_state.pop("imported_job", None)
                         else:
                             st.session_state["imported_job"] = imported
@@ -514,16 +559,32 @@ else:
                 st.caption("Some job sites block imports. Pasting the text always works.")
             else:
                 job_text = st.text_area("Target role", height=164, placeholder="e.g. A frontend engineering internship at a small product team. React, TypeScript, and accessible interfaces.", key="target_role")
-                st.caption("No job posting yet? Describe the role and skills you’re aiming for.")
+                st.caption("No job posting yet? Describe the role and skills you're aiming for.")
+
+            # Empty state when no job description entered
+            if not job_text.strip():
+                st.markdown('''
+                    <div class="job-description-empty">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+                            <path d="M14.5 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7.5L14.5 2z"/>
+                            <polyline points="14 2 14 8 20 8"/>
+                            <line x1="16" y1="13" x2="8" y2="13"/>
+                            <line x1="16" y1="17" x2="8" y2="17"/>
+                            <line x1="10" y1="9" x2="8" y2="9"/>
+                        </svg>
+                        <h4>Add a role to get started</h4>
+                        <p>Paste a job description, import from a URL, or describe your target role. The review focuses on what you provide.</p>
+                    </div>
+                ''', unsafe_allow_html=True)
 
     job_text = job_text.strip()
     ready = bool(resume_data and job_text and installed_models)
     action, action_note = st.columns([1, 1], gap="large")
     with action:
-        run_review = st.button("Give me an honest review  →", type="primary", use_container_width=True, disabled=not ready)
+        run_review = st.button("Give me an honest review  →", type="primary", use_container_width=True, disabled=not ready, key="run_review_btn")
     with action_note:
         if not resume_data:
-            note = "Start with your resume. We’ll take it from there."
+            note = "Start with your resume. We'll take it from there."
         elif not job_text:
             note = "Next, add a job description or describe your target role."
         elif not installed_models:
@@ -531,6 +592,42 @@ else:
         else:
             note = "A little tough love. A lot of actionable advice."
         st.markdown(f'<div class="action-note">{note}<small>Runs locally · Timing depends on your model and hardware</small></div>', unsafe_allow_html=True)
+
+    # Keyboard shortcut: Cmd/Ctrl+Enter in a job-description field runs the review.
+    # Streamlit does not expose widget `key`s in the DOM, so bind by the accessible
+    # label on the job-description textareas instead.
+    components.html("""
+        <script>
+        (function() {
+            // Streamlit exposes widget keys in Python, not the DOM, so match the
+            // textareas by their accessible label prefix (case-insensitive).
+            var LABELS = ['job description', 'target role', 'imported description'];
+            var bound = new WeakSet();
+            function attach() {
+                var doc = window.parent.document;
+                doc.querySelectorAll('textarea').forEach(function (ta) {
+                    if (bound.has(ta)) return;
+                    var label = (ta.getAttribute('aria-label') || '').toLowerCase();
+                    var isJobField = LABELS.some(function (l) { return label.indexOf(l) === 0; });
+                    if (!isJobField) return;
+                    bound.add(ta);
+                    ta.addEventListener('keydown', function (e) {
+                        if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) {
+                            e.preventDefault();
+                            var btn = doc.querySelector('button[data-testid="stBaseButton-primary"]');
+                            if (btn && !btn.disabled) btn.click();
+                        }
+                    });
+                });
+            }
+            // Streamlit reruns replace these nodes, so rebind on every observed change.
+            attach();
+            new MutationObserver(attach).observe(window.parent.document.body, {
+                childList: true, subtree: true
+            });
+        })();
+        </script>
+    """, height=0, width=0)
 
     if run_review and ready:
         started = time.monotonic()
@@ -565,6 +662,8 @@ else:
                 "persona": persona, "roast": content, "scores": scores,
                 "elapsed": round(time.monotonic() - started, 1),
             }
+            # Toast notification on success
+            st.toast("Review complete! 🎉", icon="✅")
         except Exception as e:
             prog_bar.empty()
             st.error(f"Generation failed. Check that Ollama is running.\n\n{str(e)}")
@@ -576,6 +675,6 @@ else:
             st.info("Your inputs or settings have changed. The report below is your previous review; run another review to update it.")
         render_report(report)
     else:
-        st.markdown('''<div class="expectations"><div class="expectations-intro"><span class="eyebrow">LESS GUESSWORK. MORE DIRECTION.</span><h3>Not just a roast.<br>A way forward.</h3><p>Know what’s working, what’s holding you back, and what to do next.</p></div><div class="expectations-list"><div><span>01</span><section><h4>The honest read</h4><p>A recruiter’s first impression, with specific fixes for every section.</p></section></div><div><span>02</span><section><h4>The details that matter</h4><p>Section scores, role alignment, and keywords you may have missed.</p></section></div><div><span>03</span><section><h4>A stronger next draft</h4><p>Focused rewrites and interview questions to help you move forward.</p></section></div></div></div>''', unsafe_allow_html=True)
+        st.markdown('''<div class="expectations"><div class="expectations-intro"><span class="eyebrow">LESS GUESSWORK. MORE DIRECTION.</span><h3>Not just a roast.<br>A way forward.</h3><p>Know what's working, what's holding you back, and what to do next.</p></div><div class="expectations-list"><div><span>01</span><section><h4>The honest read</h4><p>A recruiter's first impression, with specific fixes for every section.</p></section></div><div><span>02</span><section><h4>The details that matter</h4><p>Section scores, role alignment, and keywords you may have missed.</p></section></div><div><span>03</span><section><h4>A stronger next draft</h4><p>Focused rewrites and interview questions to help you move forward.</p></section></div></div></div>''', unsafe_allow_html=True)
 
 st.markdown('<div class="workspace-footer"><span>RoastMyResume<span class="footer-dot">·</span>Built for your next chapter.</span><span>Powered by Ollama. Kept local.</span></div>', unsafe_allow_html=True)
