@@ -98,6 +98,13 @@ textarea, input, select, button p {
 .stApp,
 [data-testid="stAppViewContainer"] { background: var(--canvas); color: var(--ink); }
 
+/* Hide Streamlit Deploy button — app is strictly local-first with Ollama */
+.stAppDeployButton,
+.stDeployButton,
+[data-testid="stDeployButton"] {
+  display: none !important;
+}
+
 /* Let Streamlit handle its own header and toolbars in 1.40+ to ensure the sidebar toggle is not accidentally hidden */
 
 [data-testid="stExpandSidebarButton"],
@@ -497,6 +504,19 @@ textarea:focus-visible,
 .upload-hint { display: flex; align-items: center; gap: 8px; font-size: var(--text-xs); color: var(--muted); padding-top: var(--space-2); }
 
 /* ─── Inputs ─────────────────────────────────────────────────────────────── */
+/* Hide Streamlit's "Press Enter to apply" hint which overlaps with input text */
+[data-testid="InputInstructions"],
+div[data-testid="InputInstructions"],
+.stTextInput [data-testid="InputInstructions"],
+.stTextArea [data-testid="InputInstructions"] {
+  display: none !important;
+  visibility: hidden !important;
+  height: 0 !important;
+  width: 0 !important;
+  opacity: 0 !important;
+  pointer-events: none !important;
+}
+
 [data-baseweb="textarea"],
 [data-baseweb="input"],
 [data-baseweb="select"] > div {
@@ -510,6 +530,9 @@ textarea:focus-visible,
 [data-baseweb="select"]:focus-within > div {
   border-color: var(--olive-mid);
   box-shadow: var(--focus-ring);
+}
+input {
+  font-size: var(--text-sm) !important;
 }
 textarea {
   font-size: var(--text-sm) !important;
