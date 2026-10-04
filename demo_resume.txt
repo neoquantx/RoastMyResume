@@ -1,0 +1,22 @@
+John "The Coder" Doe
+Email: john.coder123@email.com | Phone: 555-0192
+
+OBJECTIVE
+Looking for a high-paying tech job where I can use my skills to do cool things.
+
+EXPERIENCE
+Software Intern | Tech Corp | June 2023 - Aug 2023
+- Worked on the backend.
+- Fixed some bugs in the HTML and CSS.
+- Attended daily standups and drank a lot of coffee.
+
+Web Developer | College Tech Fest | 2022
+- Made the event website using Wix.
+- It looked really cool and had animations.
+
+SKILLS
+HTML, CSS, a little Python, MS Word, PowerPoint, Internet Surfing, Teamwork.
+
+PROJECTS
+- Calculator App: Built a calculator in Python. It can do addition, subtraction, and sometimes multiplication.
+- To-Do List: Made a to-do list in HTML.
