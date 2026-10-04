@@ -46,7 +46,7 @@ So I built an AI that would.
 ### Step 1 — Clone the repo
 
 ```bash
-git clone https://github.com/<your-username>/RoastMyResume.git
+git clone https://github.com/neoquantx/RoastMyResume.git
 cd RoastMyResume
 ```
 
@@ -82,11 +82,17 @@ curl -fsSL https://ollama.com/install.sh | sh
 # Windows → download the installer from https://ollama.com/download
 ```
 
-### Step 5 — Download the AI model
+### Step 5 — Download the AI models
+
+The app supports three local models. Pull all three so you can switch between them in the sidebar:
 
 ```bash
-ollama pull llama3.2
+ollama pull llama3.2   # Default, 3B params — fastest, lowest RAM (~2-3 GB)
+ollama pull mistral     # 7B params — better reasoning (~4.5-5.5 GB RAM)
+ollama pull gemma2      # 9B params — Google's open model (~5.5-6 GB RAM)
 ```
+
+> 💡 Short on disk space or RAM? Just pull `llama3.2` — the app works fine with one model.
 
 ### Step 6 — The `.env` file (OPTIONAL — only for the voice feature)
 
@@ -162,7 +168,7 @@ score visualisations, and the diff renderer.
 
 ## 🔧 Configuration
 
-- **Swap models** in the sidebar — `llama3.2` (default), `mistral`, `gemma2`, `phi3`, `llama3.1`. Pull any model first with `ollama pull <name>`
+- **Swap models** in the sidebar — `llama3.2` (default), `mistral`, `gemma2`. Pull any model first with `ollama pull <name>`
 - **Pick a persona** — Brutal friend, Gentle mentor, FAANG recruiter, Startup founder, Indian market expert, HR professional
 - **Fine-tune behavior** for your industry:
   ```bash
@@ -265,11 +271,9 @@ For a job seeker, their resume contains: name, phone, address, employment histor
 ### 🔄 Swap models without changing a single line of code
 ```python
 # In settings, switch instantly between:
-model = "llama3.2"    # Default, 3B params
+model = "llama3.2"    # Default, 3B params — fastest
 model = "mistral"     # Better reasoning
-model = "phi3"        # Faster on weaker laptops
 model = "gemma2"      # Google's open model
-model = "llama3.1"    # Larger, more nuanced
 ```
 
 Closed APIs (ChatGPT, Claude) lock you into one model and one pricing tier. Open-source means you pick what's right for your hardware.
