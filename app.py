@@ -19,6 +19,7 @@ from core.roaster import (
     rewrite_section,
     stream_chat_response,
     stream_roast,
+    summarize_roast_for_audio,
 )
 from core.exporter import generate_docx_export, generate_markdown_export
 from core.tts import generate_voice_roast, get_elevenlabs_key
@@ -223,17 +224,6 @@ def render_scorecard(report):
 
 def render_report(report):
     st.markdown('<div class="report-anchor" id="your-review"></div>', unsafe_allow_html=True)
-    # Auto-scroll to review on render
-    components.html("""
-        <script>
-        (function() {
-            const anchor = window.parent.document.getElementById('your-review');
-            if (anchor) {
-                anchor.scrollIntoView({ behavior: 'smooth', block: 'start' });
-            }
-        })();
-        </script>
-    """, height=0, width=0)
     section_heading("YOUR REVIEW", "A clearer picture. A practical next step.")
     st.caption(f'{report["resume"]["file_name"]} · {report["persona"]} · {report["model"]} · Generated in {report["elapsed"]}s')
     review, scorecard, rewrite, interview, chat_tab = st.tabs(["The review", "Scorecard", "Rewrite a section", "Interview prep", "💬 Q&A"])
@@ -247,9 +237,10 @@ def render_report(report):
         with col2:
             if get_elevenlabs_key():
                 if st.button("🔊 Listen to Roast (ElevenLabs)", key="play_roast", help="Generates audio using your ElevenLabs API key"):
-                    with st.spinner("Generating brutal voiceover..."):
+                    with st.spinner("Summarizing & generating voiceover..."):
                         try:
-                            audio_bytes = generate_voice_roast(report["roast"], report["persona"])
+                            summary = summarize_roast_for_audio(report["roast"], report["model"])
+                            audio_bytes = generate_voice_roast(summary, report["persona"])
                             if audio_bytes:
                                 st.audio(audio_bytes, format="audio/mp3", autoplay=True)
                         except RuntimeError as e:
