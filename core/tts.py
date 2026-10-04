@@ -61,7 +61,7 @@ def generate_voice_roast(text: str, persona: str) -> bytes | None:
     }
     
     try:
-        response = requests.post(url, json=data, headers=headers, timeout=30)
+        response = requests.post(url, json=data, headers=headers, timeout=120)
     except requests.RequestException as exc:
         # Network failures are not RuntimeError, so surface them as one error type
         # for the caller instead of letting a stack trace escape.
