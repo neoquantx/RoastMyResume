@@ -358,3 +358,25 @@ def _default_scores() -> dict:
         "missing_keywords": [],
         "strong_keywords_found": [],
     }
+
+def summarize_roast_for_audio(roast_text: str, model: str) -> str:
+    """Summarize the full roast into a short script (under 1 minute to speak)."""
+    if not model:
+        model = get_available_model()
+
+    prompt = f"""Summarize the following resume review into a punchy, spoken-word script. 
+Keep it under 150 words (about 45 seconds of speech). 
+Be direct, maintain the original persona's tone, and hit the main highlights of what is good and what needs fixing. Do not use markdown like asterisks or hashtags.
+
+REVIEW TO SUMMARIZE:
+{roast_text[:4000]}
+"""
+    try:
+        response = _client.chat(
+            model=model,
+            messages=[{"role": "user", "content": prompt}],
+            options={"temperature": 0.7, "num_predict": 256},
+        )
+        return response["message"]["content"] if isinstance(response, dict) else response.message.content
+    except Exception as e:
+        return roast_text[:800]  # Fallback to first ~800 chars
