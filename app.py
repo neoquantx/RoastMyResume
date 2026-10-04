@@ -38,6 +38,7 @@ st.set_page_config(
     layout="wide",
     initial_sidebar_state="expanded",
 )
+# Load design system and custom UI tokens
 st.markdown(
     f"<style>{(Path(__file__).parent / 'ui' / 'styles.css').read_text()}</style>",
     unsafe_allow_html=True,
@@ -390,13 +391,17 @@ installed_models = get_installed_models()
 # Only the 3 models we have downloaded (or are downloading right now)
 RECOMMENDED_MODELS = ["llama3.2", "gemma2", "mistral"]
 
-# Normalise installed tags (strip :latest suffix for display comparison)
-installed_base = [m.replace(":latest", "") for m in installed_models]
+# Clean model names: strip redundant ':latest' tag for clean UI display
+clean_installed = []
+for m in installed_models:
+    clean_name = m[:-7] if m.endswith(":latest") else m
+    if clean_name not in clean_installed:
+        clean_installed.append(clean_name)
 
 # Build list: installed models first, then any from our curated list not yet pulled
-model_options = list(installed_models)
+model_options = list(clean_installed)
 for rec in RECOMMENDED_MODELS:
-    if rec not in installed_base and rec not in model_options:
+    if rec not in clean_installed and rec not in model_options:
         model_options.append(rec + "  (downloading...)")
 
 with st.sidebar:
@@ -407,6 +412,14 @@ with st.sidebar:
     st.markdown('<div class="sidebar-label">MAKE IT YOURS</div>', unsafe_allow_html=True)
     persona = st.selectbox("Your reviewer", list(PERSONAS), key="reviewer")
     st.caption(PERSONAS[persona][0])
+
+    # Normalize existing session state if it previously stored ':latest'
+    if "local_model" in st.session_state and st.session_state["local_model"] not in model_options:
+        normalized_state = st.session_state["local_model"].replace(":latest", "")
+        if normalized_state in model_options:
+            st.session_state["local_model"] = normalized_state
+        elif model_options:
+            st.session_state["local_model"] = model_options[0]
 
     # Model picker — installed models + recommended ones labelled for pulling
     raw_selection = st.selectbox(
@@ -677,4 +690,4 @@ else:
     else:
         st.markdown('''<div class="expectations"><div class="expectations-intro"><span class="eyebrow">LESS GUESSWORK. MORE DIRECTION.</span><h3>Not just a roast.<br>A way forward.</h3><p>Know what's working, what's holding you back, and what to do next.</p></div><div class="expectations-list"><div><span>01</span><section><h4>The honest read</h4><p>A recruiter's first impression, with specific fixes for every section.</p></section></div><div><span>02</span><section><h4>The details that matter</h4><p>Section scores, role alignment, and keywords you may have missed.</p></section></div><div><span>03</span><section><h4>A stronger next draft</h4><p>Focused rewrites and interview questions to help you move forward.</p></section></div></div></div>''', unsafe_allow_html=True)
 
-st.markdown('<div class="workspace-footer"><span>RoastMyResume<span class="footer-dot">·</span>Built for your next chapter.</span><span>Powered by Ollama. Kept local.</span></div>', unsafe_allow_html=True)
+st.markdown('<div class="workspace-footer"><span>RoastMyResume<span class="footer-dot">·</span>Built for your next chapter.</span></div>', unsafe_allow_html=True)
