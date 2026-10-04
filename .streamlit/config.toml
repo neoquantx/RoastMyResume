@@ -15,3 +15,6 @@ gatherUsageStats      = false
 
 [runner]
 fastReruns            = true
+
+[client]
+toolbarMode           = "viewer"
